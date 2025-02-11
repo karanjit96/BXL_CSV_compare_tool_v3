@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BXL Data Comparison Tool V3</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+
+    <!-- Toggle Dark Mode -->
+    <div class="header-row">
+      <h1>BXL Data Comparison Tool V3</h1>
+      <div class="toggle-dark-mode">
+        <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()" />
+        <label for="darkModeToggle">Dark Mode</label>
+      </div>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="upload-section">
+      <label>
+        <input type="file" accept=".csv" id="file1" onchange="updateFileName(1)" />
+        <span>File 1 (Original)</span>
+      </label>
+      <label>
+        <input type="file" accept=".csv" id="file2" onchange="updateFileName(2)" />
+        <span>File 2</span>
+      </label>
+      <label>
+        <input type="file" accept=".csv" id="file3" onchange="updateFileName(3)" />
+        <span>File 3</span>
+      </label>
+      <label>
+        <input type="file" accept=".csv" id="file4" onchange="updateFileName(4)" />
+        <span>File 4 (Optional)</span>
+      </label>
+      <button onclick="processFiles()">Upload &amp; Compare</button>
+    </div>
+
+    <!-- KPI Section -->
+    <div class="kpi-section">
+      <div class="kpi-box" id="kpi-total">Total Features: 0</div>
+      <div class="kpi-box" id="kpi-same">Same: 0</div>
+      <div class="kpi-box" id="kpi-partial">Partial: 0</div>
+      <div class="kpi-box" id="kpi-diff">Different: 0</div>
+      <div class="kpi-box" id="kpi-missing">Missing Cells: 0</div>
+      <div class="kpi-box" id="kpi-diff2">File2 Diff: 0%</div>
+      <div class="kpi-box" id="kpi-diff3">File3 Diff: 0%</div>
+      <div class="kpi-box" id="kpi-diff4">File4 Diff: 0%</div>
+    </div>
+
+    <!-- Car Navigation Section -->
+    <div class="car-navigation" style="text-align:center; margin-bottom: 15px;">
+      <button onclick="prevCar()">Previous Car</button>
+      <select id="carSelector" onchange="onCarSelectionChange()"></select>
+      <button onclick="nextCar()">Next Car</button>
+    </div>
+
+    <!-- Controls Row (Search & Export) -->
+    <div class="controls-row">
+      <div class="search-wrapper">
+        <label for="searchInput">Search Feature:</label>
+        <input type="text" id="searchInput" placeholder="Type to filter..." oninput="filterFeatures()" />
+      </div>
+      <button class="export-btn" onclick="exportData()">Export CSV</button>
+    </div>
+
+    <!-- Color Legend -->
+    <div class="legend-section">
+      <span class="legend-item"><span class="legend-box green"></span> All Values Match</span>
+      <span class="legend-item"><span class="legend-box yellow"></span> Partial Match</span>
+      <span class="legend-item"><span class="legend-box red"></span> All Different</span>
+      <span class="legend-item"><span class="legend-box blue"></span> Empty</span>
+    </div>
+
+    <!-- Table Container -->
+    <div id="table-scale-container">
+      <div class="table-container">
+        <table id="data-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th id="file-header1">Data 1</th>
+              <th id="file-header2">Data 2</th>
+              <th id="file-header3">Data 3</th>
+              <th id="file-header4">Data 4</th>
+              <th>Final Data (Editable)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
