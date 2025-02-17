@@ -29,6 +29,7 @@ let allTableRows = [];
 let isFile4Uploaded = false;
 
 
+
 /***************************************************
  * FILE UPLOAD & PARSING
  ***************************************************/
@@ -102,6 +103,7 @@ function processFiles() {
       }
     }
   });
+  
 }
 
 /**
@@ -314,6 +316,8 @@ function prevCar() {
 }
 
 
+
+
 /***************************************************
  * BUILD COMPARISON TABLE (FOR SELECTED CAR)
  ***************************************************/
@@ -486,6 +490,8 @@ function buildComparisonTableForCar() {
   document.getElementById("kpi-diff2").innerText = `File2 Diff: ${calcDiffPercent(diffFile2, compareCount2)}`;
   document.getElementById("kpi-diff3").innerText = `File3 Diff: ${calcDiffPercent(diffFile3, compareCount3)}`;
   document.getElementById("kpi-diff4").innerText = `File4 Diff: ${calcDiffPercent(diffFile4, compareCount4)}`;
+
+
 }
 
 
@@ -521,6 +527,17 @@ function toggleDarkMode() {
     document.body.classList.remove("pixelate-transition");
   }, 600);
 }
+/***************************************************
+ * Loading overlay
+ ***************************************************/
+
+function showLoadingOverlay() {
+  document.getElementById("loadingOverlay").style.display = "flex"; 
+}
+
+function hideLoadingOverlay() {
+  document.getElementById("loadingOverlay").style.display = "none";
+}
 
 
 /***************************************************
@@ -528,6 +545,8 @@ function toggleDarkMode() {
  ***************************************************/
 
 function exportData() {
+  // Show the overlay
+  showLoadingOverlay();
   let csvContent = "Feature,Final Data\n";
   document.querySelectorAll("#data-table tbody tr").forEach((row) => {
     const feature = row.cells[0].innerText;
@@ -545,4 +564,80 @@ function exportData() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  // Hide the overlay
+  hideLoadingOverlay();
 }
+
+/**
+ * Exports all cars in columns. Each row = a Feature, and each column = that Feature’s Final Data 
+ * for a particular car. Features that appear in multiple cars line up in the same row.
+ *
+ * Note: This approach temporarily re-renders the table for each car in order to read 
+ * the "Final Data" inputs from the DOM. For large datasets, consider storing user-edited
+ * values in an array/object, so you don't have to rebuild the table each time.
+ */
+function exportAllData() {
+  // Show the overlay
+  showLoadingOverlay();
+
+  setTimeout(() => {
+  // 1) Build CSV header: "Feature" + each car name
+  let csvContent = "Feature";
+  allCars.forEach(carName => {
+    csvContent += `,"${carName}"`;
+  });
+  csvContent += "\n";
+
+  // 2) Gather *all* features (union) from file1’s carFeaturesOrder
+  //    (If you only want the features from file1, or from every file, adjust accordingly.)
+  const allFeaturesSet = new Set();
+  allCars.forEach(carName => {
+    const featureList = carFeaturesOrder[carName] || [];
+    featureList.forEach(f => allFeaturesSet.add(f));
+  });
+  const allFeatures = Array.from(allFeaturesSet);
+
+  // 3) For each feature, we’ll add one CSV row
+  allFeatures.forEach(feature => {
+    // Start row with "Feature" name
+    let rowData = [`"${feature}"`];
+
+    // For each car, temporarily render that car in the table, then read the final data for this feature
+    allCars.forEach(carName => {
+      // Switch the table to the current car so we can read the Final Data input from the DOM
+      currentCarIndex = allCars.indexOf(carName);
+      buildComparisonTableForCar();
+
+      // Find the row (tr) for this feature
+      const rowEl = Array.from(document.querySelectorAll("#data-table tbody tr"))
+        .find(r => r.cells[0].innerText === feature);
+
+      // If row found, grab the user-edited value from the last cell’s <input>
+      let finalValue = "";
+      if (rowEl) {
+        const inputEl = rowEl.cells[rowEl.cells.length - 1].querySelector("input");
+        if (inputEl) finalValue = inputEl.value;
+      }
+
+      // Push quoted finalValue to CSV row
+      rowData.push(`"${finalValue}"`);
+    });
+
+    csvContent += rowData.join(",") + "\n";
+  });
+
+  // 4) Download
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const a = document.createElement("a");
+  const now = new Date();
+  const timestamp = now.toISOString().slice(0, 19).replace("T", "_").replace(/:/g, "-");
+  a.download = `all_cars_side_by_side_${timestamp}.csv`;
+  a.href = URL.createObjectURL(blob);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Hide the overlay
+  hideLoadingOverlay();
+}, 50);
+}
+

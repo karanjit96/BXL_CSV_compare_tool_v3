@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BXL Data Comparison Tool V3</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.0/dist/xlsx.full.min.js"></script>
   <script src="script.js"></script>
 
@@ -67,7 +68,8 @@
         <label for="searchInput">Search Feature:</label>
         <input type="text" id="searchInput" placeholder="Type to filter..." oninput="filterFeatures()" />
       </div>
-      <button class="export-btn" onclick="exportData()">Export CSV</button>
+        <button class="export-btn" onclick="exportData()">Export Current Car CSV</button>
+        <button class="export-btn" onclick="exportAllData()">Export All Cars CSV</button>
     </div>
 
     <!-- Color Legend -->
@@ -98,7 +100,14 @@
     </div>
 
   </div>
+ 
 
   <script src="script.js"></script>
+
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <p>Exporting data, please wait...</p>
+  </div>
+  
 </body>
 </html>
