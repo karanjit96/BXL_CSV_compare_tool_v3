@@ -13,18 +13,12 @@
 let fileData = [ {}, {}, {}, {} ];
 
 // We'll store the "feature order" exactly as they appear in the original file (file1).
-// Specifically, for each car in file1, we keep an array of features in the order encountered.
-let carFeaturesOrder = {}; 
-// Example structure:
-//   carFeaturesOrder["CarA"] = ["feature1","feature2","feature3",...]
-//   carFeaturesOrder["CarB"] = [...]
-// etc.
+let carFeaturesOrder = {};
 
-// Keep track of file names for display
+// File names for display
 let fileNames = ["Data 1", "Data 2", "Data 3", "Data 4"];
 
-// Keep track of all cars that appear in file1 (the original) 
-// because we only want to show them in that same order.
+// Keep track of all cars that appear in file1 (the original)
 let allCars = [];
 let currentCarIndex = 0;
 
@@ -62,7 +56,7 @@ function processFiles() {
 
   // At least three files required
   if (!files[0] || !files[1] || !files[2]) {
-    alert("Please upload at least three CSV files (File1, File2, File3).");
+    alert("Please upload at least three CSV or Excel files (File1, File2, File3).");
     return;
   }
 
@@ -80,57 +74,84 @@ function processFiles() {
 
   files.forEach((file, i) => {
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        // Parse multi-column CSV
-        parseMultiColumnCSV(event.target.result, i);
-        readCount++;
-        if (readCount === totalToRead) {
-          // Once all files are read, let's finalize allCars
-          // We only care about the cars that appeared in file1
-          // because that's our "original" reference.
-          allCars = Object.keys(carFeaturesOrder);
-          // Sort them or keep them in order? 
-          // Usually we won't reorder them, but they might come from multiple columns.
-          // If you want them sorted, you could do: allCars.sort();
-          // If you want the order from file1's columns, that order is 
-          // the order in which columns appear in the CSV. We'll keep it as is.
-          // But typically columns are read left to right, so let's not forcibly reorder.
-
-          // Build the car selector
-          updateCarSelector();
-          // Build the comparison table for the first car
-          buildComparisonTableForCar();
-        }
-      };
-      reader.readAsText(file);
+      // Check the extension
+      if (isCSV(file.name)) {
+        // Parse as CSV
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          parseMultiColumnCSV(event.target.result, i);
+          readCount++;
+          if (readCount === totalToRead) {
+            finalizeData();
+          }
+        };
+        reader.readAsText(file);
+      } else if (isExcel(file.name)) {
+        // Parse as Excel
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          parseExcel(event.target.result, i);
+          readCount++;
+          if (readCount === totalToRead) {
+            finalizeData();
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        alert(`Unsupported file format: ${file.name}. Please upload CSV or Excel files.`);
+      }
     }
   });
 }
 
 /**
+ * After reading all files, build the car list and the initial table.
+ */
+function finalizeData() {
+  // Once all files are read, let's finalize allCars
+  // We only care about the cars that appeared in file1 (index=0)
+  allCars = Object.keys(carFeaturesOrder);
+
+  // Update the car selector
+  updateCarSelector();
+
+  // Build the comparison table for the first car
+  buildComparisonTableForCar();
+}
+
+/**
+ * Checks if file is .csv (case-insensitive).
+ */
+function isCSV(filename) {
+  return /\.(csv)$/i.test(filename);
+}
+
+/**
+ * Checks if file is .xls or .xlsx (case-insensitive).
+ */
+function isExcel(filename) {
+  return /\.(xls|xlsx)$/i.test(filename);
+}
+
+/**
  * Parse CSV text (multi-column). If it's the 0th file (index===0), record the
- * exact feature order for each car as we read them.
+ * exact feature order for each car.
  *
  * CSV format example:
  *   Feature,CarA,CarB,CarC
  *   feat1,valA1,valB1,valC1
  *   feat2,valA2,valB2,valC2
  *   ...
- *
- * We'll store data in fileData[fileIndex][carName][feature].
  */
 function parseMultiColumnCSV(csvText, fileIndex) {
   const lines = csvText.trim().split("\n");
-  if (lines.length < 2) {
-    return;
-  }
+  if (lines.length < 2) return;
 
   // Parse the header row
   const headerRow = safeSplitCSVLine(lines[0]);
   // first column is "Feature", subsequent columns are car names
-  const carNames = headerRow.slice(1); // e.g. [ "CarA", "CarB", "CarC" ]
-  
+  const carNames = headerRow.slice(1);
+
   // Make sure we have a data structure for each car in fileData[fileIndex]
   carNames.forEach((car) => {
     if (!fileData[fileIndex][car]) {
@@ -153,11 +174,11 @@ function parseMultiColumnCSV(csvText, fileIndex) {
     // For each car column
     for (let colIndex = 1; colIndex < row.length; colIndex++) {
       const carName = headerRow[colIndex].trim();
-      // If this carName exists in fileData[fileIndex]
       if (fileData[fileIndex][carName]) {
         const cellValue = row[colIndex].trim();
         fileData[fileIndex][carName][feature] = cellValue;
-        // If this is file1 (original) and we haven't recorded this feature yet for this car, record it in order.
+
+        // If this is file1 (original) and we haven't recorded this feature yet, record it in order.
         if (fileIndex === 0) {
           const featureList = carFeaturesOrder[carName];
           if (!featureList.includes(feature)) {
@@ -178,6 +199,82 @@ function safeSplitCSVLine(line) {
   return tokens.map((t) => t.replace(/^"|"$/g, "").trim());
 }
 
+/**
+ * Parse an Excel file (ArrayBuffer) using SheetJS, then convert it to a 2D array
+ * for further processing.
+ */
+function parseExcel(arrayBuffer, fileIndex) {
+  // Read the file using XLSX
+  const data = new Uint8Array(arrayBuffer);
+  const workbook = XLSX.read(data, { type: "array" });
+
+  // Just take the first sheet
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+
+  // Convert the sheet to a 2D array
+  // By default, { header: 1 } means the first row is returned as an array of header strings
+  const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  parseMultiColumnArray(sheetData, fileIndex);
+}
+
+/**
+ * Parse a 2D array (already split into rows/columns).
+ *
+ * Array format example:
+ * [
+ *   [ 'Feature', 'CarA', 'CarB', 'CarC' ],
+ *   [ 'feat1', 'valA1', 'valB1', 'valC1' ],
+ *   [ 'feat2', 'valA2', 'valB2', 'valC2' ],
+ *   ...
+ * ]
+ */
+function parseMultiColumnArray(sheetData, fileIndex) {
+  if (!sheetData || sheetData.length < 2) return;
+
+  // The first row is the header
+  const headerRow = sheetData[0];
+  // first column is "Feature", subsequent columns are car names
+  const carNames = headerRow.slice(1);
+
+  // Make sure we have a data structure for each car in fileData[fileIndex]
+  carNames.forEach((car) => {
+    if (!fileData[fileIndex][car]) {
+      fileData[fileIndex][car] = {};
+    }
+    // If it's the first/original file, also set up the feature order array
+    if (fileIndex === 0 && !carFeaturesOrder[car]) {
+      carFeaturesOrder[car] = [];
+    }
+  });
+
+  // For each subsequent row
+  for (let i = 1; i < sheetData.length; i++) {
+    const row = sheetData[i] || [];
+    if (row.length < 2) continue;
+
+    const feature = (row[0] || "").trim();
+    if (!feature) continue;
+
+    // For each car column
+    for (let colIndex = 1; colIndex < row.length; colIndex++) {
+      const carName = (headerRow[colIndex] || "").trim();
+      if (fileData[fileIndex][carName]) {
+        const cellValue = (row[colIndex] || "").toString().trim();
+        fileData[fileIndex][carName][feature] = cellValue;
+
+        // If this is file1 (original) and we haven't recorded this feature yet, record in order.
+        if (fileIndex === 0) {
+          const featureList = carFeaturesOrder[carName];
+          if (!featureList.includes(feature)) {
+            featureList.push(feature);
+          }
+        }
+      }
+    }
+  }
+}
+
 
 /***************************************************
  * CAR NAVIGATION & SELECTOR
@@ -186,8 +283,6 @@ function safeSplitCSVLine(line) {
 function updateCarSelector() {
   const selector = document.getElementById("carSelector");
   selector.innerHTML = "";
-  // If you want them in the order they appeared in file1's columns, do not sort here.
-  // Just create <option> in the order of allCars array.
   allCars.forEach((car, index) => {
     const option = document.createElement("option");
     option.value = index;
@@ -223,14 +318,9 @@ function prevCar() {
  * BUILD COMPARISON TABLE (FOR SELECTED CAR)
  ***************************************************/
 
-/**
- * Builds the comparison table for the currently selected car,
- * using the exact feature order from file1 (carFeaturesOrder).
- */
 function buildComparisonTableForCar() {
   const carName = allCars[currentCarIndex];
   if (!carName) {
-    // no cars
     document.querySelector("#data-table tbody").innerHTML = "";
     return;
   }
@@ -282,7 +372,7 @@ function buildComparisonTableForCar() {
       val === "" ? `_EMPTY_${rowIndex}_${colIndex}` : val
     );
 
-    // Check if all are same, all distinct, or partial
+    // Determine row color category
     const uniqueVals = new Set(transformedValues);
     let rowColorClass = "";
     let finalValue = "";
@@ -291,19 +381,19 @@ function buildComparisonTableForCar() {
       uniqueVals.size === 1 && ![...uniqueVals][0].startsWith("_EMPTY_");
 
     if (allNonEmptyAreSame) {
-      // green
+      // Green - all same
       rowColorClass = "green";
       sameCount++;
-      finalValue = rowValues[0]; // they are all the same
+      finalValue = rowValues[0];
     } else if (uniqueVals.size === rowValues.length) {
-      // red (all distinct)
+      // Red - all distinct
       rowColorClass = "red";
       diffCount++;
     } else {
-      // yellow (partial)
+      // Yellow - partial
       rowColorClass = "yellow";
       partialCount++;
-      // pick most common non-empty
+      // Pick the most common non-empty value
       const freqMap = {};
       rowValues.forEach((v) => {
         if (v !== "") {
@@ -322,7 +412,7 @@ function buildComparisonTableForCar() {
       finalValue = bestVal;
     }
 
-    // Compare file2..4 vs file1 if file1 has non-empty
+    // Compare file2..4 vs file1 if file1 is non-empty
     const valFile1 = rowValues[0];
     if (valFile1) {
       // file2
@@ -342,7 +432,7 @@ function buildComparisonTableForCar() {
       }
     }
 
-    // Create <tr>
+    // Create table row
     const tr = document.createElement("tr");
     tr.setAttribute("data-feature", feature);
 
@@ -363,11 +453,10 @@ function buildComparisonTableForCar() {
       tr.appendChild(td);
     });
 
-    // Final data cell (editable)
+    // Final (editable) cell
     const finalTd = document.createElement("td");
     const input = document.createElement("input");
     input.type = "text";
-
     if (rowColorClass === "green") {
       input.value = finalValue;
       input.style.backgroundColor = "#c8e6c9"; // light green
@@ -384,9 +473,9 @@ function buildComparisonTableForCar() {
 
   // Update KPIs
   document.getElementById("kpi-total").innerText = `Total Features: ${featureList.length}`;
-  document.getElementById("kpi-same").innerText = `Same (Green): ${sameCount}`;
-  document.getElementById("kpi-partial").innerText = `Partial (Yellow): ${partialCount}`;
-  document.getElementById("kpi-diff").innerText = `Different (Red): ${diffCount}`;
+  document.getElementById("kpi-same").innerText = `Same: ${sameCount}`;
+  document.getElementById("kpi-partial").innerText = `Partial: ${partialCount}`;
+  document.getElementById("kpi-diff").innerText = `Different: ${diffCount}`;
   document.getElementById("kpi-missing").innerText = `Missing Cells: ${missingCellCount}`;
 
   // Diff percentages
@@ -422,27 +511,22 @@ function filterFeatures() {
  ***************************************************/
 
 function toggleDarkMode() {
-    document.body.classList.add("pixelate-transition");
-  
-    setTimeout(() => {
-      document.body.classList.toggle("dark-mode");
-    }, 200);
-  
-    setTimeout(() => {
-      document.body.classList.remove("pixelate-transition");
-    }, 600);
-  }
-  
+  document.body.classList.add("pixelate-transition");
+
+  setTimeout(() => {
+    document.body.classList.toggle("dark-mode");
+  }, 200);
+
+  setTimeout(() => {
+    document.body.classList.remove("pixelate-transition");
+  }, 600);
+}
 
 
 /***************************************************
  * EXPORT
  ***************************************************/
 
-/**
- * Export CSV containing "Feature" and the final edited column
- * for the currently selected car.
- */
 function exportData() {
   let csvContent = "Feature,Final Data\n";
   document.querySelectorAll("#data-table tbody tr").forEach((row) => {

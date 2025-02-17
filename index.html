@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BXL Data Comparison Tool V3</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.0/dist/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+
 </head>
 <body>
   <div class="container">
@@ -21,19 +24,19 @@
     <!-- Upload Section -->
     <div class="upload-section">
       <label>
-        <input type="file" accept=".csv" id="file1" onchange="updateFileName(1)" />
+        <input type="file" accept=".csv,.xls,.xlsx" id="file1" onchange="updateFileName(1)" />
         <span>File 1 (Original)</span>
       </label>
       <label>
-        <input type="file" accept=".csv" id="file2" onchange="updateFileName(2)" />
+        <input type="file" accept=".csv,.xls,.xlsx" id="file2" onchange="updateFileName(2)" />
         <span>File 2</span>
       </label>
       <label>
-        <input type="file" accept=".csv" id="file3" onchange="updateFileName(3)" />
+        <input type="file" accept=".csv,.xls,.xlsx" id="file3" onchange="updateFileName(3)" />
         <span>File 3</span>
       </label>
       <label>
-        <input type="file" accept=".csv" id="file4" onchange="updateFileName(4)" />
+        <input type="file" accept=".csv,.xls,.xlsx" id="file4" onchange="updateFileName(4)" />
         <span>File 4 (Optional)</span>
       </label>
       <button onclick="processFiles()">Upload &amp; Compare</button>
