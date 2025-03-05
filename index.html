@@ -4,25 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BXL Data Comparison Tool V3</title>
-  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Chart.js + XLSX (Excel parser) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.0/dist/xlsx.full.min.js"></script>
-  <script src="script.js"></script>
 
+  <!-- Your existing styles -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Main Script -->
+  <script src="script.js"></script>
 </head>
+
 <body>
   <div class="container">
 
-    <!-- Toggle Dark Mode -->
+    <!-- ===== HEADER (Title + Dark Mode + Help) ===== -->
     <div class="header-row">
       <h1>BXL Data Comparison Tool V3</h1>
-      <div class="toggle-dark-mode">
-        <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()" />
-        <label for="darkModeToggle">Dark Mode</label>
+      <div style="display: flex; align-items:center; gap: 15px;">
+        <div class="toggle-dark-mode">
+          <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()" />
+          <label for="darkModeToggle">Dark Mode</label>
+        </div>
+        <button class="help-btn" onclick="toggleHelpModal()">Help</button>
       </div>
     </div>
 
-    <!-- Upload Section -->
+    <!-- ===== UPLOAD SECTION (Files) ===== -->
     <div class="upload-section">
       <label>
         <input type="file" accept=".csv,.xls,.xlsx" id="file1" onchange="updateFileName(1)" />
@@ -40,10 +49,15 @@
         <input type="file" accept=".csv,.xls,.xlsx" id="file4" onchange="updateFileName(4)" />
         <span>File 4 (Optional)</span>
       </label>
-      <button onclick="processFiles()">Upload &amp; Compare</button>
     </div>
 
-    <!-- KPI Section -->
+    <!-- ===== CONTROL BUTTONS ROW ===== -->
+    <div style="text-align:center; margin-bottom: 20px;">
+      <button onclick="processFiles()">Upload &amp; Compare</button>
+      <button onclick="resetAll()">Reset Data</button>
+    </div>
+
+    <!-- ===== KPI SECTION ===== -->
     <div class="kpi-section">
       <div class="kpi-box" id="kpi-total">Total Features: 0</div>
       <div class="kpi-box" id="kpi-same">Same: 0</div>
@@ -55,32 +69,69 @@
       <div class="kpi-box" id="kpi-diff4">File4 Diff: 0%</div>
     </div>
 
-    <!-- Car Navigation Section -->
-    <div class="car-navigation" style="text-align:center; margin-bottom: 15px;">
+    <!-- ===== CHARTS SECTION (unchanged) ===== -->
+    <div id="charts-container">
+      <div id="chartOverlay" class="chart-overlay">
+        <p>Please upload and compare files to see charts.</p>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="compareChart" width="300" height="250"></canvas>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="diffChart" width="300" height="250"></canvas>
+      </div>
+    </div>
+
+    <!-- ===== CAR NAVIGATION ===== -->
+    <div class="car-navigation" style="text-align:center; margin-bottom: 20px;">
       <button onclick="prevCar()">Previous Car</button>
       <select id="carSelector" onchange="onCarSelectionChange()"></select>
       <button onclick="nextCar()">Next Car</button>
     </div>
 
-    <!-- Controls Row (Search & Export) -->
-    <div class="controls-row">
+    <!-- ===== NEW SEPARATE ROW FOR SEARCH ONLY ===== -->
+    <div class="controls-row" style="justify-content: flex-start;">
       <div class="search-wrapper">
-        <label for="searchInput">Search Feature:</label>
-        <input type="text" id="searchInput" placeholder="Type to filter..." oninput="filterFeatures()" />
+        <label for="searchInput">Search All Columns:</label>
+        <input 
+          type="text"
+          id="searchInput" 
+          placeholder="Type to filter..." 
+          oninput="filterFeatures()" 
+        />
       </div>
-        <button class="export-btn" onclick="exportData()">Export Current Car CSV</button>
-        <button class="export-btn" onclick="exportAllData()">Export All Cars CSV</button>
     </div>
 
-    <!-- Color Legend -->
+    <!-- ===== NEW SEPARATE ROW FOR EXPORT & COMPARE BUTTONS ===== -->
+    <div class="controls-row" style="flex-wrap: wrap; justify-content: flex-start; gap: 10px;">
+      <button class="export-btn" onclick="exportData()">Export Current Car CSV</button>
+      <button class="export-btn" onclick="exportDataXLSX()">Export Current Car Excel</button>
+      <button class="export-btn" onclick="exportAllData()">Export All Cars CSV</button>
+      <button class="export-btn" onclick="exportAllDataXLSX()">Export All Cars Excel</button>
+      <!--<button class="export-btn" onclick="compareAllCars()">Compare All Cars</button> -->
+    </div>
+
+    <!-- ===== COLOR LEGEND ===== -->
     <div class="legend-section">
-      <span class="legend-item"><span class="legend-box green"></span> All Values Match</span>
-      <span class="legend-item"><span class="legend-box yellow"></span> Partial Match</span>
-      <span class="legend-item"><span class="legend-box red"></span> All Different</span>
-      <span class="legend-item"><span class="legend-box blue"></span> Empty</span>
+      <span class="legend-item">
+        <span class="legend-box green"></span> All Values Match
+      </span>
+      <span class="legend-item">
+        <span class="legend-box yellow"></span> Partial Match
+      </span>
+      <span class="legend-item">
+        <span class="legend-box red"></span> All Different
+      </span>
+      <span class="legend-item">
+        <span class="legend-box blue"></span> Empty
+      </span>
     </div>
 
-    <!-- Table Container -->
+    <!-- Table Title / Car Name -->
+    <div id="selectedCarTitle" style="text-align:center; margin: 10px 0; font-weight: bold; font-size: 1.2rem;">
+      <!-- This will be updated dynamically -->
+    </div>
+    <!-- ===== TABLE CONTAINER ===== -->
     <div id="table-scale-container">
       <div class="table-container">
         <table id="data-table">
@@ -99,15 +150,41 @@
       </div>
     </div>
 
-  </div>
- 
+  </div> <!-- end .container -->
 
-  <script src="script.js"></script>
-
+  <!-- ===== LOADING OVERLAY ===== -->
   <div id="loadingOverlay" class="loading-overlay" style="display: none;">
     <div class="spinner"></div>
     <p>Exporting data, please wait...</p>
   </div>
-  
+
+  <!-- ===== HELP MODAL ===== -->
+  <div id="helpModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="close" onclick="toggleHelpModal()">&times;</span>
+      <h2>Help / Instructions</h2>
+      <!-- (Unchanged) -->
+      <p>
+        <strong>Steps to Use the Tool:</strong>
+        <ul>
+          <li>Upload up to 4 files: at least 3 are required.</li>
+          <li>Click <em>Upload &amp; Compare</em> to parse data.</li>
+          <li>Select a car from the dropdown or use <em>Previous/Next Car</em>.</li>
+          <li>Review each feature row. <em>Final Data</em> is editable and autosaves to your browser.</li>
+          <li>Use the search box to filter features by text in <em>any column</em>.</li>
+          <li>Export data to CSV/Excel for the current car or all cars side-by-side.</li>
+          <li>If you want to start fresh, click <em>Reset Data</em>.</li>
+        </ul>
+      </p>
+      <p>
+        <strong>Colors:</strong><br />
+        <span style="background:#c8e6c9; padding:3px 6px;">Green</span> = All values match<br />
+        <span style="background:#fff59d; padding:3px 6px;">Yellow</span> = Partial match<br />
+        <span style="background:#ffccbc; padding:3px 6px;">Red</span> = All different<br />
+        <span style="background:#bbdefb; padding:3px 6px;">Blue</span> = Empty cell
+      </p>
+    </div>
+  </div>
+
 </body>
 </html>
