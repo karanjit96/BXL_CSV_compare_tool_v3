@@ -28,6 +28,7 @@ let diffChartInstance = null;
  * FILE UPLOAD & PARSING
  ***************************************************/
 
+// Update file name in the headers
 function updateFileName(index) {
   const fileInput = document.getElementById(`file${index}`);
   const newName = fileInput.files[0] ? fileInput.files[0].name : `Data ${index}`;
@@ -55,7 +56,7 @@ function processFiles() {
   carFeaturesOrder = {};
   allCars = [];
   currentCarIndex = 0;
-  localStorage.clear(); 
+  localStorage.clear(); // optional: clear autosaved data
 
   let readCount = 0;
   const totalToRead = files.filter(f => f).length;
@@ -92,33 +93,40 @@ function processFiles() {
 }
 
 function finalizeData() {
-  // Gather cars from file1
+  // Cars from file1
   allCars = Object.keys(carFeaturesOrder);
 
-  // Update the car selector
+  // Update car selector
   updateCarSelector();
 
-  // Hide chart overlay since we have data
+  // Hide chart overlay
   document.getElementById("chartOverlay").style.display = "none";
 
-  // Build table for the first car
+  // Build table for first car
   buildComparisonTableForCar();
 }
 
+// Check if CSV
 function isCSV(filename) {
   return /\.(csv)$/i.test(filename);
 }
+// Check if Excel
 function isExcel(filename) {
   return /\.(xls|xlsx)$/i.test(filename);
 }
 
+// -------------------------
+// CSV Parsing
+// -------------------------
 function parseMultiColumnCSV(csvText, fileIndex) {
-  const lines = csvText.trim().split("\n");
-  if (lines.length < 2) return;
+  const lines = csvText.split("\n");
+  if (lines.length < 1) return;
 
+  // Parse header row
   const headerRow = safeSplitCSVLine(lines[0]);
   const carNames = headerRow.slice(1);
 
+  // Prep data structures
   carNames.forEach((car) => {
     if (!fileData[fileIndex][car]) {
       fileData[fileIndex][car] = {};
@@ -128,19 +136,24 @@ function parseMultiColumnCSV(csvText, fileIndex) {
     }
   });
 
+  // Parse each data row
   for (let i = 1; i < lines.length; i++) {
     const row = safeSplitCSVLine(lines[i]);
-    if (!row || row.length < 2) continue;
+    if (!row || row.length === 0) continue; // skip truly empty lines
 
-    const feature = row[0].trim();
+    // The first cell is the "feature" name
+    const feature = (row[0] || "").trim();
+    // If the feature is empty, skip
     if (!feature) continue;
 
+    // For each car column in this row
     for (let colIndex = 1; colIndex < row.length; colIndex++) {
-      const carName = headerRow[colIndex].trim();
-      if (fileData[fileIndex][carName]) {
-        const cellValue = row[colIndex].trim();
+      const carName = (headerRow[colIndex] || "").trim();
+      if (carName && fileData[fileIndex][carName]) {
+        const cellValue = row[colIndex] ? row[colIndex].trim() : "";
         fileData[fileIndex][carName][feature] = cellValue;
 
+        // If we're in file1, record the feature in order
         if (fileIndex === 0) {
           const featureList = carFeaturesOrder[carName];
           if (!featureList.includes(feature)) {
@@ -152,12 +165,16 @@ function parseMultiColumnCSV(csvText, fileIndex) {
   }
 }
 
+// Safely split CSV line
 function safeSplitCSVLine(line) {
   const tokens = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
   if (!tokens) return [];
   return tokens.map((t) => t.replace(/^"|"$/g, "").trim());
 }
 
+// -------------------------
+// Excel Parsing
+// -------------------------
 function parseExcel(arrayBuffer, fileIndex) {
   const data = new Uint8Array(arrayBuffer);
   const workbook = XLSX.read(data, { type: "array" });
@@ -168,11 +185,13 @@ function parseExcel(arrayBuffer, fileIndex) {
 }
 
 function parseMultiColumnArray(sheetData, fileIndex) {
-  if (!sheetData || sheetData.length < 2) return;
+  if (!sheetData || sheetData.length < 1) return;
 
+  // The first row is the header row: ["Feature", "CarA", "CarB", ...]
   const headerRow = sheetData[0];
   const carNames = headerRow.slice(1);
 
+  // Prep data structures
   carNames.forEach((car) => {
     if (!fileData[fileIndex][car]) {
       fileData[fileIndex][car] = {};
@@ -182,19 +201,26 @@ function parseMultiColumnArray(sheetData, fileIndex) {
     }
   });
 
+  // For each subsequent row
   for (let i = 1; i < sheetData.length; i++) {
     const row = sheetData[i] || [];
-    if (row.length < 2) continue;
+    // Skip if the row is completely empty
+    if (row.length === 0) continue;
 
+    // The first cell is our feature name
     const feature = (row[0] || "").trim();
+    // If the feature name is empty, skip
     if (!feature) continue;
 
+    // For each car column in this row
     for (let colIndex = 1; colIndex < row.length; colIndex++) {
       const carName = (headerRow[colIndex] || "").trim();
-      if (fileData[fileIndex][carName]) {
+      if (carName && fileData[fileIndex][carName]) {
+        // Even if it's empty, store it so the table knows about this row
         const cellValue = (row[colIndex] || "").toString().trim();
         fileData[fileIndex][carName][feature] = cellValue;
 
+        // If it's file1, record the feature in order
         if (fileIndex === 0) {
           const featureList = carFeaturesOrder[carName];
           if (!featureList.includes(feature)) {
@@ -250,18 +276,17 @@ function prevCar() {
 
 function buildComparisonTableForCar() {
   const carName = allCars[currentCarIndex];
-  // Clear if no car
   if (!carName) {
     document.querySelector("#data-table tbody").innerHTML = "";
-    // Clear the heading if you want:
+    // optional: clear heading if you have a big title
     document.getElementById("selectedCarTitle").innerText = "";
     return;
   }
 
-  // Display big bold heading for the selected car
-  document.getElementById("selectedCarTitle").innerText = `${carName}`;
+  // Display big heading for the selected car
+  document.getElementById("selectedCarTitle").innerText = carName;
 
-  // Show/hide 4th file column
+  // Show/hide the 4th file column
   document.getElementById("file-header4").style.display = isFile4Uploaded ? "" : "none";
 
   // Update column headers
@@ -270,7 +295,7 @@ function buildComparisonTableForCar() {
   document.getElementById("file-header3").innerText = fileNames[2];
   document.getElementById("file-header4").innerText = fileNames[3];
 
-  // Original order from file1
+  // Grab the features from file1 in original order
   const featureList = carFeaturesOrder[carName] || [];
   const totalFeatures = featureList.length;
 
@@ -303,9 +328,8 @@ function buildComparisonTableForCar() {
     // Count missing
     missingCellCount += rowValues.filter((v) => v === "").length;
 
-    // Case-insensitive array
+    // For case-insensitive logic:
     const lowerVals = rowValues.map((v) => v.toLowerCase());
-
     // Convert empty to placeholders
     const transformedVals = lowerVals.map((v, colIndex) =>
       v === "" ? `_EMPTY_${rowIndex}_${colIndex}` : v
@@ -315,7 +339,7 @@ function buildComparisonTableForCar() {
     let rowColorClass = "";
     let finalValue = "";
 
-    // All non-empty are same ignoring case
+    // Are all non-empty (ignoring case) the same?
     const allNonEmptyAreSame =
       uniqueVals.size === 1 &&
       ![...uniqueVals][0].startsWith("_EMPTY_");
@@ -331,10 +355,11 @@ function buildComparisonTableForCar() {
       diffCount++;
 
     } else {
+      // partial
       rowColorClass = "yellow";
       partialCount++;
 
-      // Most common non-empty ignoring case, preserve original
+      // Most common ignoring case, preserve original
       const freqMap = {};
       rowValues.forEach((origVal) => {
         if (origVal !== "") {
@@ -361,17 +386,14 @@ function buildComparisonTableForCar() {
     const valFile1 = rowValues[0];
     if (valFile1) {
       const lowerFile1 = valFile1.toLowerCase();
-      // file2
       if (rowValues[1]) {
         compareCount2++;
         if (rowValues[1].toLowerCase() !== lowerFile1) diffFile2++;
       }
-      // file3
       if (rowValues[2]) {
         compareCount3++;
         if (rowValues[2].toLowerCase() !== lowerFile1) diffFile3++;
       }
-      // file4
       if (isFile4Uploaded && rowValues[3]) {
         compareCount4++;
         if (rowValues[3].toLowerCase() !== lowerFile1) diffFile4++;
@@ -418,7 +440,6 @@ function buildComparisonTableForCar() {
     }
     finalInput.value = finalValue;
 
-    // color hints
     if (rowColorClass === "green") {
       finalInput.style.backgroundColor = "#c8e6c9";
     } else if (rowColorClass === "yellow") {
@@ -432,6 +453,7 @@ function buildComparisonTableForCar() {
     finalTd.appendChild(finalInput);
     tr.appendChild(finalTd);
 
+    // optional tooltip for partial/diff
     if (rowColorClass === "yellow" || rowColorClass === "red") {
       tr.title = tooltipTextForRowIgnoringCase(rowValues);
     }
@@ -440,13 +462,14 @@ function buildComparisonTableForCar() {
     allTableRows.push(tr);
   });
 
-  // KPIs
+  // Update KPIs
   document.getElementById("kpi-total").innerText = `Total Features: ${totalFeatures}`;
   document.getElementById("kpi-same").innerText = `Same: ${sameCount}`;
   document.getElementById("kpi-partial").innerText = `Partial: ${partialCount}`;
   document.getElementById("kpi-diff").innerText = `Different: ${diffCount}`;
   document.getElementById("kpi-missing").innerText = `Missing Cells: ${missingCellCount}`;
 
+  // Diff percentages
   function calcDiffPercent(dCount, cCount) {
     if (!cCount) return "0%";
     return ((dCount / cCount) * 100).toFixed(1) + "%";
@@ -478,6 +501,7 @@ function tooltipTextForRowIgnoringCase(rowValues) {
   return differences.join(", ");
 }
 
+// Inline editing for data columns
 function autosaveEditedData(carName, feature, fileIndex, value) {
   localStorage.setItem(`colData_${carName}_${feature}_${fileIndex}`, value);
 }
@@ -552,7 +576,7 @@ function resetAll() {
   if (compareChartInstance) compareChartInstance.destroy();
   if (diffChartInstance) diffChartInstance.destroy();
 
-  // Clear big heading
+  // If you have a big heading for the selected car:
   document.getElementById("selectedCarTitle").innerText = "";
 }
 
@@ -616,7 +640,7 @@ function exportAllData() {
   showLoadingOverlay();
 
   setTimeout(() => {
-    // 1) Header
+    // 1) Build header
     let csvContent = "Feature";
     allCars.forEach(carName => {
       csvContent += `,"${carName}"`;
@@ -847,7 +871,7 @@ function updateCharts(sameCount, partialCount, diffCount, diff2Pct, diff3Pct, di
   const barCtx = document.getElementById("diffChart").getContext("2d");
   if (diffChartInstance) diffChartInstance.destroy();
 
-  // Convert XX% => numeric
+  // Convert "XX%" => numeric
   const diff2 = parseFloat(diff2Pct);
   const diff3 = parseFloat(diff3Pct);
   const diff4 = parseFloat(diff4Pct);
