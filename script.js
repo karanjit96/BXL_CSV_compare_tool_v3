@@ -28,7 +28,7 @@ let diffChartInstance = null;
  * FILE UPLOAD & PARSING
  ***************************************************/
 
-// Update file name in the headers
+// Update file name in the header columns
 function updateFileName(index) {
   const fileInput = document.getElementById(`file${index}`);
   const newName = fileInput.files[0] ? fileInput.files[0].name : `Data ${index}`;
@@ -56,7 +56,7 @@ function processFiles() {
   carFeaturesOrder = {};
   allCars = [];
   currentCarIndex = 0;
-  localStorage.clear(); // optional: clear autosaved data
+  localStorage.clear();
 
   let readCount = 0;
   const totalToRead = files.filter(f => f).length;
@@ -93,40 +93,41 @@ function processFiles() {
 }
 
 function finalizeData() {
-  // Cars from file1
+  // Once parsing is done, gather car names from file1
   allCars = Object.keys(carFeaturesOrder);
 
-  // Update car selector
+  // Update the car selector
   updateCarSelector();
 
-  // Hide chart overlay
+  // Hide chart overlay (we have data)
   document.getElementById("chartOverlay").style.display = "none";
 
-  // Build table for first car
+  // Build the table for the first car
   buildComparisonTableForCar();
 }
 
-// Check if CSV
 function isCSV(filename) {
   return /\.(csv)$/i.test(filename);
 }
-// Check if Excel
+
 function isExcel(filename) {
   return /\.(xls|xlsx)$/i.test(filename);
 }
 
-// -------------------------
-// CSV Parsing
-// -------------------------
+
+/***************************************************
+ * CSV PARSING
+ ***************************************************/
+
 function parseMultiColumnCSV(csvText, fileIndex) {
   const lines = csvText.split("\n");
   if (lines.length < 1) return;
 
-  // Parse header row
+  // Header row
   const headerRow = safeSplitCSVLine(lines[0]);
   const carNames = headerRow.slice(1);
 
-  // Prep data structures
+  // Setup data structures
   carNames.forEach((car) => {
     if (!fileData[fileIndex][car]) {
       fileData[fileIndex][car] = {};
@@ -136,45 +137,45 @@ function parseMultiColumnCSV(csvText, fileIndex) {
     }
   });
 
-  // Parse each data row
+  // For each subsequent line
   for (let i = 1; i < lines.length; i++) {
     const row = safeSplitCSVLine(lines[i]);
-    if (!row || row.length === 0) continue; // skip truly empty lines
+    if (!row || row.length === 0) continue; // skip fully empty lines
 
-    // The first cell is the "feature" name
     const feature = (row[0] || "").trim();
-    // If the feature is empty, skip
-    if (!feature) continue;
+    if (!feature) continue; // skip if feature name is empty
 
-    // For each car column in this row
+    // IMPORTANT FIX: if fileIndex === 0, we add this feature to every car's list
+    if (fileIndex === 0) {
+      carNames.forEach((car) => {
+        if (!carFeaturesOrder[car].includes(feature)) {
+          carFeaturesOrder[car].push(feature);
+        }
+      });
+    }
+
+    // Now read data from columns
     for (let colIndex = 1; colIndex < row.length; colIndex++) {
       const carName = (headerRow[colIndex] || "").trim();
       if (carName && fileData[fileIndex][carName]) {
         const cellValue = row[colIndex] ? row[colIndex].trim() : "";
         fileData[fileIndex][carName][feature] = cellValue;
-
-        // If we're in file1, record the feature in order
-        if (fileIndex === 0) {
-          const featureList = carFeaturesOrder[carName];
-          if (!featureList.includes(feature)) {
-            featureList.push(feature);
-          }
-        }
       }
     }
   }
 }
 
-// Safely split CSV line
 function safeSplitCSVLine(line) {
   const tokens = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
   if (!tokens) return [];
   return tokens.map((t) => t.replace(/^"|"$/g, "").trim());
 }
 
-// -------------------------
-// Excel Parsing
-// -------------------------
+
+/***************************************************
+ * EXCEL PARSING
+ ***************************************************/
+
 function parseExcel(arrayBuffer, fileIndex) {
   const data = new Uint8Array(arrayBuffer);
   const workbook = XLSX.read(data, { type: "array" });
@@ -187,11 +188,11 @@ function parseExcel(arrayBuffer, fileIndex) {
 function parseMultiColumnArray(sheetData, fileIndex) {
   if (!sheetData || sheetData.length < 1) return;
 
-  // The first row is the header row: ["Feature", "CarA", "CarB", ...]
+  // The first row is the header
   const headerRow = sheetData[0];
   const carNames = headerRow.slice(1);
 
-  // Prep data structures
+  // Setup data structures
   carNames.forEach((car) => {
     if (!fileData[fileIndex][car]) {
       fileData[fileIndex][car] = {};
@@ -204,29 +205,26 @@ function parseMultiColumnArray(sheetData, fileIndex) {
   // For each subsequent row
   for (let i = 1; i < sheetData.length; i++) {
     const row = sheetData[i] || [];
-    // Skip if the row is completely empty
-    if (row.length === 0) continue;
+    if (row.length === 0) continue; // fully empty row
 
-    // The first cell is our feature name
     const feature = (row[0] || "").trim();
-    // If the feature name is empty, skip
-    if (!feature) continue;
+    if (!feature) continue; // skip if the feature is empty
 
-    // For each car column in this row
+    // IMPORTANT FIX: if fileIndex === 0, we add this feature to every car's list
+    if (fileIndex === 0) {
+      carNames.forEach((car) => {
+        if (!carFeaturesOrder[car].includes(feature)) {
+          carFeaturesOrder[car].push(feature);
+        }
+      });
+    }
+
+    // Now read data columns
     for (let colIndex = 1; colIndex < row.length; colIndex++) {
       const carName = (headerRow[colIndex] || "").trim();
       if (carName && fileData[fileIndex][carName]) {
-        // Even if it's empty, store it so the table knows about this row
         const cellValue = (row[colIndex] || "").toString().trim();
         fileData[fileIndex][carName][feature] = cellValue;
-
-        // If it's file1, record the feature in order
-        if (fileIndex === 0) {
-          const featureList = carFeaturesOrder[carName];
-          if (!featureList.includes(feature)) {
-            featureList.push(feature);
-          }
-        }
       }
     }
   }
@@ -278,24 +276,24 @@ function buildComparisonTableForCar() {
   const carName = allCars[currentCarIndex];
   if (!carName) {
     document.querySelector("#data-table tbody").innerHTML = "";
-    // optional: clear heading if you have a big title
+    // Clear heading if you have one:
     document.getElementById("selectedCarTitle").innerText = "";
     return;
   }
 
-  // Display big heading for the selected car
+  // Big heading for the selected car
   document.getElementById("selectedCarTitle").innerText = carName;
 
   // Show/hide the 4th file column
   document.getElementById("file-header4").style.display = isFile4Uploaded ? "" : "none";
 
-  // Update column headers
+  // Update displayed column headers
   document.getElementById("file-header1").innerText = fileNames[0];
   document.getElementById("file-header2").innerText = fileNames[1];
   document.getElementById("file-header3").innerText = fileNames[2];
   document.getElementById("file-header4").innerText = fileNames[3];
 
-  // Grab the features from file1 in original order
+  // The features for this car from file1 in original order
   const featureList = carFeaturesOrder[carName] || [];
   const totalFeatures = featureList.length;
 
@@ -314,9 +312,9 @@ function buildComparisonTableForCar() {
   let diffFile2 = 0, diffFile3 = 0, diffFile4 = 0;
   let compareCount2 = 0, compareCount3 = 0, compareCount4 = 0;
 
-  // Build each row
+  // Build rows
   featureList.forEach((feature, rowIndex) => {
-    // Up to 4 values
+    // Gather up to 4 values
     const rowValues = [];
     for (let i = 0; i < 4; i++) {
       if (i === 3 && !isFile4Uploaded) break;
@@ -328,7 +326,7 @@ function buildComparisonTableForCar() {
     // Count missing
     missingCellCount += rowValues.filter((v) => v === "").length;
 
-    // For case-insensitive logic:
+    // Case-insensitive array
     const lowerVals = rowValues.map((v) => v.toLowerCase());
     // Convert empty to placeholders
     const transformedVals = lowerVals.map((v, colIndex) =>
@@ -339,7 +337,7 @@ function buildComparisonTableForCar() {
     let rowColorClass = "";
     let finalValue = "";
 
-    // Are all non-empty (ignoring case) the same?
+    // Are all non-empty ignoring case the same?
     const allNonEmptyAreSame =
       uniqueVals.size === 1 &&
       ![...uniqueVals][0].startsWith("_EMPTY_");
@@ -350,12 +348,10 @@ function buildComparisonTableForCar() {
       finalValue = rowValues[0];
 
     } else if (uniqueVals.size === rowValues.length) {
-      // All distinct ignoring case
       rowColorClass = "red";
       diffCount++;
 
     } else {
-      // partial
       rowColorClass = "yellow";
       partialCount++;
 
@@ -453,7 +449,7 @@ function buildComparisonTableForCar() {
     finalTd.appendChild(finalInput);
     tr.appendChild(finalTd);
 
-    // optional tooltip for partial/diff
+    // optional tooltip
     if (rowColorClass === "yellow" || rowColorClass === "red") {
       tr.title = tooltipTextForRowIgnoringCase(rowValues);
     }
@@ -485,6 +481,7 @@ function buildComparisonTableForCar() {
   updateCharts(sameCount, partialCount, diffCount, diff2Pct, diff3Pct, diff4Pct);
 }
 
+// Example partial/diff tooltip
 function tooltipTextForRowIgnoringCase(rowValues) {
   const file1 = rowValues[0] || "";
   if (!file1) return "File1 empty";
@@ -501,7 +498,7 @@ function tooltipTextForRowIgnoringCase(rowValues) {
   return differences.join(", ");
 }
 
-// Inline editing for data columns
+// Inline editing
 function autosaveEditedData(carName, feature, fileIndex, value) {
   localStorage.setItem(`colData_${carName}_${feature}_${fileIndex}`, value);
 }
@@ -570,13 +567,13 @@ function resetAll() {
   // Clear the car selector
   document.getElementById("carSelector").innerHTML = "";
 
-  // Hide charts again
+  // Hide chart overlay
   document.getElementById("chartOverlay").style.display = "flex";
 
   if (compareChartInstance) compareChartInstance.destroy();
   if (diffChartInstance) diffChartInstance.destroy();
 
-  // If you have a big heading for the selected car:
+  // Clear heading
   document.getElementById("selectedCarTitle").innerText = "";
 }
 
